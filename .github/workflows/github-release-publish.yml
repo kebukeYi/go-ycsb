@@ -12,15 +12,20 @@ jobs:
     permissions:
       id-token: write # To sign.
       contents: write # To upload release assets.
-      actions: read   # To read workflow path.
+      actions: read # To read workflow path.
     strategy:
       fail-fast: false
       matrix:
         goos: [linux, darwin]
         goarch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v3
-      - uses: wangyoucao577/go-release-action@v1.28
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
@@ -29,3 +34,4 @@ jobs:
           sha256sum: true
           asset_name: go-ycsb-${{ matrix.goos }}-${{ matrix.goarch }}
           build_command: "make"
+          goversion: go.mod

@@ -74,6 +74,10 @@ import (
 	_ "github.com/pingcap/go-ycsb/db/elasticsearch"
 	// Register etcd
 	_ "github.com/pingcap/go-ycsb/db/etcd"
+	// Register trainkv
+	_ "github.com/pingcap/go-ycsb/db/trainkv"
+	// Register pebble
+	_ "github.com/pingcap/go-ycsb/db/pebble"
 	// Register dynamodb
 	_ "github.com/pingcap/go-ycsb/db/dynamodb"
 	// Register s3 database

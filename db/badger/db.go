@@ -18,38 +18,31 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dgraph-io/badger"
-	"github.com/dgraph-io/badger/options"
+	"github.com/dgraph-io/badger/v4"
+	badgeroptions "github.com/dgraph-io/badger/v4/options"
 	"github.com/magiconair/properties"
 	"github.com/pingcap/go-ycsb/pkg/prop"
 	"github.com/pingcap/go-ycsb/pkg/util"
 	"github.com/pingcap/go-ycsb/pkg/ycsb"
 )
 
-//  properties
+// properties
 const (
-	badgerDir                     = "badger.dir"
-	badgerValueDir                = "badger.valuedir"
-	badgerSyncWrites              = "badger.sync_writes"
-	badgerNumVersionsToKeep       = "badger.num_versions_to_keep"
-	badgerMaxTableSize            = "badger.max_table_size"
-	badgerLevelSizeMultiplier     = "badger.level_size_multiplier"
-	badgerMaxLevels               = "badger.max_levels"
-	badgerValueThreshold          = "badger.value_threshold"
-	badgerNumMemtables            = "badger.num_memtables"
-	badgerNumLevelZeroTables      = "badger.num_level0_tables"
-	badgerNumLevelZeroTablesStall = "badger.num_level0_tables_stall"
-	badgerLevelOneSize            = "badger.level_one_size"
-	badgerValueLogFileSize        = "badger.value_log_file_size"
-	badgerValueLogMaxEntries      = "badger.value_log_max_entries"
-	badgerNumCompactors           = "badger.num_compactors"
-	badgerDoNotCompact            = "badger.do_not_compact"
-	badgerTableLoadingMode        = "badger.table_loading_mode"
-	badgerValueLogLoadingMode     = "badger.value_log_loading_mode"
-	// TODO: add more configurations
+	badgerDir               = "badger.dir"
+	badgerValueDir          = "badger.valuedir"
+	badgerSyncWrites        = "badger.sync_writes"
+	badgerNumVersionsToKeep = "badger.num_versions_to_keep"
+	badgerMemTableSize      = "badger.memtable_size"
+	badgerValueThreshold    = "badger.value_threshold"
+	badgerNumCompactors     = "badger.num_compactors"
+	badgerCompression       = "badger.compression" // none|snappy|zstd
 )
 
 type badgerCreator struct {
+}
+
+func init() {
+	ycsb.RegisterDBCreator("badger", badgerCreator{})
 }
 
 type badgerDB struct {
@@ -90,43 +83,25 @@ func (c badgerCreator) Create(p *properties.Properties) (ycsb.DB, error) {
 }
 
 func getOptions(p *properties.Properties) badger.Options {
-	opts := badger.DefaultOptions
-	opts.Dir = p.GetString(badgerDir, "/tmp/badger")
-	opts.ValueDir = p.GetString(badgerValueDir, opts.Dir)
-
-	opts.SyncWrites = p.GetBool(badgerSyncWrites, false)
-	opts.NumVersionsToKeep = p.GetInt(badgerNumVersionsToKeep, 1)
-	opts.MaxTableSize = p.GetInt64(badgerMaxTableSize, 64<<20)
-	opts.LevelSizeMultiplier = p.GetInt(badgerLevelSizeMultiplier, 10)
-	opts.MaxLevels = p.GetInt(badgerMaxLevels, 7)
-	opts.ValueThreshold = p.GetInt(badgerValueThreshold, 32)
-	opts.NumMemtables = p.GetInt(badgerNumMemtables, 5)
-	opts.NumLevelZeroTables = p.GetInt(badgerNumLevelZeroTables, 5)
-	opts.NumLevelZeroTablesStall = p.GetInt(badgerNumLevelZeroTablesStall, 10)
-	opts.LevelOneSize = p.GetInt64(badgerLevelOneSize, 256<<20)
-	opts.ValueLogFileSize = p.GetInt64(badgerValueLogFileSize, 1<<30)
-	opts.ValueLogMaxEntries = uint32(p.GetUint64(badgerValueLogMaxEntries, 1000000))
-	opts.NumCompactors = p.GetInt(badgerNumCompactors, 3)
-	opts.DoNotCompact = p.GetBool(badgerDoNotCompact, false)
-	if b := p.GetString(badgerTableLoadingMode, "LoadToRAM"); len(b) > 0 {
-		if b == "FileIO" {
-			opts.TableLoadingMode = options.FileIO
-		} else if b == "LoadToRAM" {
-			opts.TableLoadingMode = options.LoadToRAM
-		} else if b == "MemoryMap" {
-			opts.TableLoadingMode = options.MemoryMap
-		}
+	dir := p.GetString(badgerDir, "/tmp/badger")
+	opts := badger.DefaultOptions(dir)
+	opts.ValueDir = p.GetString(badgerValueDir, dir)
+	opts.SyncWrites = p.GetBool(badgerSyncWrites, opts.SyncWrites)
+	opts.NumVersionsToKeep = p.GetInt(badgerNumVersionsToKeep, opts.NumVersionsToKeep)
+	opts.MemTableSize = p.GetInt64(badgerMemTableSize, opts.MemTableSize)
+	// v4 默认阈值为 1MB(行进 LSM 内联); 复现 v1(32B)/trainkv 的 vlog 布局时显式设 32
+	opts.ValueThreshold = p.GetInt64(badgerValueThreshold, opts.ValueThreshold)
+	opts.NumCompactors = p.GetInt(badgerNumCompactors, opts.NumCompactors)
+	switch p.GetString(badgerCompression, "") {
+	case "none":
+		opts.Compression = badgeroptions.None
+	case "snappy":
+		opts.Compression = badgeroptions.Snappy
+	case "zstd":
+		opts.Compression = badgeroptions.ZSTD
+	default:
+		// 空值走引擎默认(v4 为 Snappy); 与 v1 行为一致需显式传 none
 	}
-	if b := p.GetString(badgerValueLogLoadingMode, "MemoryMap"); len(b) > 0 {
-		if b == "FileIO" {
-			opts.ValueLogLoadingMode = options.FileIO
-		} else if b == "LoadToRAM" {
-			opts.ValueLogLoadingMode = options.LoadToRAM
-		} else if b == "MemoryMap" {
-			opts.ValueLogLoadingMode = options.MemoryMap
-		}
-	}
-
 	return opts
 }
 
@@ -153,7 +128,7 @@ func (db *badgerDB) Read(ctx context.Context, table string, key string, fields [
 		if err != nil {
 			return err
 		}
-		row, err := item.Value()
+		row, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
 		}
@@ -169,7 +144,13 @@ func (db *badgerDB) Scan(ctx context.Context, table string, startKey string, cou
 	res := make([]map[string][]byte, count)
 	err := db.db.View(func(txn *badger.Txn) error {
 		rowStartKey := db.getRowKey(table, startKey)
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		opts := badger.DefaultIteratorOptions
+		if count <= 1 {
+			// badger 开启 PrefetchValues 时会对每个预取 item 起一个 goroutine 读 value;
+			// 只取 1 行时预取(最多 PrefetchSize 行)纯属浪费, 关闭后按需惰性读取;
+			opts.PrefetchValues = false
+		}
+		it := txn.NewIterator(opts)
 		defer it.Close()
 
 		i := 0
@@ -203,7 +184,7 @@ func (db *badgerDB) Update(ctx context.Context, table string, key string, values
 			return err
 		}
 
-		value, err := item.Value()
+		value, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
 		}
@@ -256,8 +237,4 @@ func (db *badgerDB) Delete(ctx context.Context, table string, key string) error 
 	})
 
 	return err
-}
-
-func init() {
-	ycsb.RegisterDBCreator("badger", badgerCreator{})
 }

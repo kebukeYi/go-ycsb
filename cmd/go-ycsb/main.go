@@ -21,6 +21,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -120,6 +121,12 @@ func initialGlobal(dbName string, onProperties func()) {
 	go func() {
 		http.ListenAndServe(addr, nil)
 	}()
+
+	// 性能排查开关(默认关闭): 开启后 /debug/pprof/block 与 /debug/pprof/mutex 才有数据
+	if globalProps.GetBool("debug.blockprofile", false) {
+		runtime.SetBlockProfileRate(1)      // 1=采样每个阻塞事件(注意采样开销)
+		runtime.SetMutexProfileFraction(1)  // 1=采样全部锁竞争
+	}
 
 	measurement.InitMeasure(globalProps)
 

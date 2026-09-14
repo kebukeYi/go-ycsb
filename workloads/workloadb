@@ -21,6 +21,9 @@
 #   Default data size: 1 KB records (10 fields, 100 bytes each, plus key)
 #   Request distribution: zipfian
 
+# 95%读/5%更新
+# 读多写少的场景(典型应用: 照片标签, 读取远多于写入), 95% 读 + 5% 更新。
+#   键按 zipfian 分布访问, 适合评估读密集负载下的读吞吐, 以及少量更新对读性能的干扰。
 recordcount=1000
 operationcount=1000
 workload=core
@@ -32,5 +35,6 @@ updateproportion=0.05
 scanproportion=0
 insertproportion=0
 
-requestdistribution=uniform
+# requestdistribution=uniform
+requestdistribution=zipfian
 

@@ -302,8 +302,10 @@ github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfV
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
-github.com/kebukeYi/TrainKV/v2 v2.0.3 h1:LVHoFX9cKD3mFJ9Wlz8nHNRVLwyyaoRsS8px/u4x4jg=
-github.com/kebukeYi/TrainKV/v2 v2.0.3/go.mod h1:shl6/yd9HYZTmunXTJ6+RrLsJ5ElOUVKWN7UcgE+1IE=
+github.com/kebukeYi/TrainKV/v2 v2.0.5 h1:ORQitWodfHYm9Lold6rmClQzrddASLo6Qfu5yqOxSqM=
+github.com/kebukeYi/TrainKV/v2 v2.0.5/go.mod h1:shl6/yd9HYZTmunXTJ6+RrLsJ5ElOUVKWN7UcgE+1IE=
+github.com/kebukeYi/TrainKV/v2 v2.0.6-0.20260913164801-4675bbcdfdcf h1:PI7NSaT4LMuMpBCZjyE9Zua7tCJKsoStwFkmvjIi6bY=
+github.com/kebukeYi/TrainKV/v2 v2.0.6-0.20260913164801-4675bbcdfdcf/go.mod h1:shl6/yd9HYZTmunXTJ6+RrLsJ5ElOUVKWN7UcgE+1IE=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=

@@ -13,6 +13,8 @@
 # permissions and limitations under the License. See accompanying
 # LICENSE file.
 
+# 本文件是 Java 版 YCSB 的官方 workload 模板。go-ycsb 兼容其中大部分键;
+#   少数 Java 专属键(标注为 [仅 Java 版])在 go-ycsb 中会被忽略, 不影响运行。
 # Yahoo! Cloud System Benchmark
 # Workload Template: Default Values
 #
@@ -27,9 +29,13 @@
 # CoreWorkload.java or on the YCSB wiki page:
 # https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties
 
+# 工作负载实现的名字。go-ycsb 按名字查已注册的 workload(内置 "core");
+#   它决定 load/run 的行为、操作组合与键分布的实现。
 # The name of the workload class to use
 workload=core
 
+# load 阶段要插入的记录总数; run 阶段表示键空间大小(已存在的记录数)。
+#   无默认值、必填; 可用命令行 -p recordcount=N 覆盖。
 # There is no default setting for recordcount but it is
 # required to be set.
 # The number of records in the table to be inserted in
@@ -37,84 +43,127 @@ workload=core
 # table before the run phase.
 recordcount=1000000
 
+# run 阶段要执行的操作总数(全部线程合计)。无默认值、必填。
 # There is no default setting for operationcount but it is
 # required to be set.
 # The number of operations to use during the run phase.
 operationcount=3000000
 
+# 并发工作线程数。go-ycsb 等价于命令行 --threads;
+#   命令行显式传 --threads 时, 会覆盖此文件中的值。
 # The number of thread.
 threadcount=500 
 
+# 中额外插入的记录条数(与 recordcount 不同时才需要), 常配合 insertstart
+#   在已有表上追加数据; 本行被注释表示不额外插入。go-ycsb 支持此键。
 # The number of insertions to do, if different from recordcount.
 # Used with insertstart to grow an existing table.
 #insertcount=
 
+# 第一条插入记录的键偏移(键空间起始编号), 用于在已有数据之后继续插入。
 # The offset of the first insertion
 insertstart=0
 
+# 一条记录的字段个数(字段名为 field0..field(N-1))。
+#   与 fieldlength 一起决定行大小; KV 适配器用 RowCodec 编码整行。
 # The number of fields in a record
 fieldcount=10
 
+# 每个字段的字节数。默认行大小 ≈ fieldcount × fieldlength(本模板 ≈1KB)。
 # The size of each field (in bytes)
 fieldlength=100
 
+# 读操作是否读取整行全部字段。false 时只随机读一个字段
+#   (支持字段投影的适配器会少读数据, 如 RowCodec 行编码的引擎)。
 # Should read all fields
 readallfields=true
 
+# update 操作是否重写整行所有字段。false 时只更新一个随机字段。
+#   注意: 多数数据库适配器按整行覆盖语义实现, 通常保持 true。
 # Should write all fields on update
 writeallfields=false
 
+# 字段长度的取值分布。go-ycsb 支持 4 种:
+#   constant(固定 fieldlength) / uniform(1..fieldlength 均匀)
+#   / zipfian / histogram(需另配 fieldlengthhistogram 指向直方图文件)。
 # The distribution used to choose the length of a field
 fieldlengthdistribution=constant
 #fieldlengthdistribution=uniform
 #fieldlengthdistribution=zipfian
 
+# 以下 5 个 proportion 是 run 阶段的操作组合比例: 每个操作按概率随机选择,
+#   各项会自动归一化(不必加起来等于 1)。go-ycsb 五种全部支持。
+#   read=读; update=更新整行; insert=插入新记录;
+#   readmodifywriteproportion=读改写(先读一行, 再整行写回, 类似自增场景);
+#   scan=范围扫描(长度由 maxscanlength/scanlengthdistribution 决定)。
 # What proportion of operations are reads
 readproportion=0.95
 
 # What proportion of operations are updates
-updateproportion=0.05
+updateproportion=0.25
 
 # What proportion of operations are inserts
-insertproportion=0
+insertproportion=0.05
 
+# (读改写: 读出一行后立即整行写回, 常用于计数器/自增场景)
 # What proportion of operations read then modify a record
 readmodifywriteproportion=0
 
+#  (扫描: 每次从随机起点读一段连续记录, 用于压测范围查询)
 # What proportion of operations are scans
-scanproportion=0
+scanproportion=0.05
 
+# 单次 scan 最多读取的记录数。go-ycsb 还支持 minscanlength(模板未列出,
+#   默认 1), 实际长度在 [min, max] 之间按 scanlengthdistribution 采样。
 # On a single scan, the maximum number of records to access
 maxscanlength=1000
 
+# scan 长度的分布。go-ycsb 仅支持 uniform(均匀) 与 zipfian。
 # The distribution used to choose the number of records to access on a scan
-scanlengthdistribution=uniform
-#scanlengthdistribution=zipfian
+# scanlengthdistribution=uniform
+scanlengthdistribution=zipfian
 
+# load 阶段键的插入顺序。hashed=伪随机(键被散列打散, 对 LSM 引擎友好、避免顺序写热点); ordered=按键顺序递增插入。
 # Should records be inserted in order or pseudo-randomly
 insertorder=hashed
 #insertorder=ordered
 
+# run 阶段选择被访问键的分布。go-ycsb 支持 6 种:
+#   uniform(均匀) / sequential(顺序) / zipfian(齐夫, 热点倾斜)
+#   / latest(最近写入的键) / hotspot(热点集, 见下两个参数)
+#   / exponential(指数分布, 可用 exponential.percentile / exponential.frac 调参)。
 # The distribution of requests across the keyspace
 requestdistribution=zipfian
 #requestdistribution=uniform
 #requestdistribution=latest
 
+# 仅 requestdistribution=hotspot 时生效: 热点数据占键空间的比例
+#   (0.2 表示 20% 的键构成热点集)。
 # Percentage of data items that constitute the hot set
 hotspotdatafraction=0.2
 
+# 仅 requestdistribution=hotspot 时生效: 操作命中热点集的比例
+#   (0.8 表示 80% 的操作落在热点键上)。
 # Percentage of operations that access the hot set
 hotspotopnfraction=0.8
 
+# run 阶段的最长执行时间(秒), 到点自动停止(不设则跑满 operationcount)。
+#   go-ycsb 支持此键; 本行被注释表示不限制。
 # Maximum execution time in seconds
 #maxexecutiontime= 
 
+# 目标表名。KV 引擎中作为键前缀 table:key 的 table 部分。
+#   命令行 --table 可覆盖; load 与 run 必须使用同一个表名。
 # The name of the database table to run queries against
 table=usertable
 
+# [仅限部分数据库, 如 HBase/Cassandra] 列族名。go-ycsb 不支持, 会被忽略。
 # The column family of fields (required by some databases)
 #columnfamily=
 
+# 延迟测量方式。go-ycsb 支持: histogram(默认, 输出区间吞吐与分位延迟)
+#   和 raw/csv(逐条原始数据, 可用 measurement.output_file 指定输出文件)。
+#   模板里列出的 timeseries 是 Java 版功能, go-ycsb 未实现。
 # How the latency measurements are presented
 measurementtype=histogram
 #measurementtype=timeseries
@@ -129,13 +178,17 @@ measurementtype=histogram
 # fit into memory most of the time. If you plan to do 100s of millions of
 # operations per run, consider provisioning a machine with larger RAM when using
 # the RAW measurement type, or split the run into multiple runs.
-#
+
+
+# [键名差异] 模板中的 measurement.raw.output_file 是 Java 版键名;
+#   go-ycsb 对应键名为 measurement.output_file(语义相同: 追加写入)。
 # Optionally, you can specify an output file to save raw datapoints.
 # Otherwise, raw datapoints will be written to stdout.
 # The output file will be appended to if it already exists, otherwise
 # a new output file will be created.
 #measurement.raw.output_file = /tmp/your_output_file_for_this_run
 
+# [仅 Java 版] JVM 状态采集(GC/内存/线程数等, 需配合 -s 参数)。go-ycsb 不支持。
 # JVM Reporting.
 #
 # Measure JVM information over time including GC counts, max and min memory
@@ -146,12 +199,17 @@ measurementtype=histogram
 # be recorded.
 # measurement.trackjvm = false
 
+# [仅 Java 版] 延迟直方图的跟踪上限(毫秒)。go-ycsb 未实现; 如需导出分位数,
+#   go-ycsb 可用 histogram.percentiles.export / histogram.percentiles.export.filepath。
 # The range of latencies to track in the histogram (milliseconds)
 histogram.buckets=1000
 
+# [仅 Java 版] timeseries 输出的时间粒度(毫秒)。go-ycsb 未实现。
 # Granularity for time series (in milliseconds)
 timeseries.granularity=1000
 
+# [仅 Java 版] 失败操作延迟统计及按错误码细分(reportlatencyforeacherror /
+#   latencytrackederrors)。go-ycsb 不支持这些键, 失败操作统一计入对应操作类型。
 # Latency reporting.
 #
 # YCSB records latency of failed operations separately from successful ones.
@@ -170,6 +228,10 @@ timeseries.granularity=1000
 # reportlatencyforeacherror=false
 # latencytrackederrors="<comma separated strings of error codes>"
 
+# 插入失败重试(core workload)。go-ycsb 同样支持下面两个被注释的键:
+#   core_workload_insertion_retry_limit(重试次数, 默认 0=不重试; 为 0 时 load
+#   阶段一旦插入失败会终止整个 load 进程) 与 core_workload_insertion_retry_interval
+#   (重试间隔秒数, 默认 3)。
 # Insertion error retry for the core workload.
 #
 # By default, the YCSB core workload does not retry any operations.
@@ -183,6 +245,7 @@ timeseries.granularity=1000
 # the following number controls the interval between retries (in seconds):
 # core_workload_insertion_retry_interval = 3
 
+# [仅 Java 版] Apache HTrace 分布式链路追踪。go-ycsb 不支持, 整段忽略。
 # Distributed Tracing via Apache HTrace (http://htrace.incubator.apache.org/)
 #
 # Defaults to blank / no tracing

@@ -3,8 +3,8 @@ package trainkv
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"runtime/pprof"
 
 	TrainKV "github.com/kebukeYi/TrainKV/v2"
 	"github.com/kebukeYi/TrainKV/v2/interfaces"
@@ -32,6 +32,24 @@ type trainkvCreator struct{}
 
 func init() {
 	ycsb.RegisterDBCreator("trainkv", trainkvCreator{})
+}
+
+// 关键路径 pprof 标签: 预构建 LabelSet, 避免每次调用重新分配.
+// 采集后可用 `go tool pprof -tags <prof>` 查看, `-tagfocus=op=get` / `-tagshow=op` 按操作类型过滤.
+// 注意: Go 1.27 中仅 CPU / goroutine profile 会携带用户标签, block/mutex/heap 不带.
+var (
+	labelGet    = pprof.Labels("op", "get")
+	labelPut    = pprof.Labels("op", "put")
+	labelDelete = pprof.Labels("op", "delete")
+	labelScan   = pprof.Labels("op", "scan")
+)
+
+// withLabels 在 f 执行期间给当前 goroutine(含其派生的 goroutine)打上标签.
+func withLabels(ctx context.Context, labels pprof.LabelSet, f func()) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	pprof.Do(ctx, labels, func(context.Context) { f() })
 }
 
 type trainkvDB struct {
@@ -90,11 +108,27 @@ func (db *trainkvDB) InitThread(ctx context.Context, _ int, _ int) context.Conte
 func (db *trainkvDB) CleanupThread(_ context.Context) {
 }
 
+// getRowKey 位于每 op 热路径, 直接拼一次字节切片, 避免 fmt.Sprintf 的接口/反射开销;
 func (db *trainkvDB) getRowKey(table string, key string) []byte {
-	return util.Slice(fmt.Sprintf("%s:%s", table, key))
+	buf := make([]byte, 0, len(table)+1+len(key))
+	buf = append(buf, table...)
+	buf = append(buf, ':')
+	buf = append(buf, key...)
+	return buf
 }
 
 func (db *trainkvDB) Read(ctx context.Context, table string, key string, fields []string) (map[string][]byte, error) {
+	var (
+		value map[string][]byte
+		err   error
+	)
+	withLabels(ctx, labelGet, func() {
+		value, err = db.read(table, key, fields)
+	})
+	return value, err
+}
+
+func (db *trainkvDB) read(table string, key string, fields []string) (map[string][]byte, error) {
 	txn := db.db.NewTransaction(false)
 	defer txn.Discard()
 
@@ -107,6 +141,17 @@ func (db *trainkvDB) Read(ctx context.Context, table string, key string, fields 
 }
 
 func (db *trainkvDB) Scan(ctx context.Context, table string, startKey string, count int, fields []string) ([]map[string][]byte, error) {
+	var (
+		res []map[string][]byte
+		err error
+	)
+	withLabels(ctx, labelScan, func() {
+		res, err = db.scan(table, startKey, count, fields)
+	})
+	return res, err
+}
+
+func (db *trainkvDB) scan(table string, startKey string, count int, fields []string) ([]map[string][]byte, error) {
 	txn := db.db.NewTransaction(false)
 	defer txn.Discard()
 
@@ -130,6 +175,14 @@ func (db *trainkvDB) Scan(ctx context.Context, table string, startKey string, co
 }
 
 func (db *trainkvDB) Update(ctx context.Context, table string, key string, values map[string][]byte) error {
+	var err error
+	withLabels(ctx, labelPut, func() {
+		err = db.update(table, key, values)
+	})
+	return err
+}
+
+func (db *trainkvDB) update(table string, key string, values map[string][]byte) error {
 	txn := db.db.NewTransaction(true)
 
 	rowKey := db.getRowKey(table, key)
@@ -171,6 +224,14 @@ func (db *trainkvDB) Update(ctx context.Context, table string, key string, value
 }
 
 func (db *trainkvDB) Insert(ctx context.Context, table string, key string, values map[string][]byte) error {
+	var err error
+	withLabels(ctx, labelPut, func() {
+		err = db.insert(table, key, values)
+	})
+	return err
+}
+
+func (db *trainkvDB) insert(table string, key string, values map[string][]byte) error {
 	txn := db.db.NewTransaction(true)
 
 	buf := db.bufPool.Get()
@@ -194,6 +255,14 @@ func (db *trainkvDB) Insert(ctx context.Context, table string, key string, value
 }
 
 func (db *trainkvDB) Delete(ctx context.Context, table string, key string) error {
+	var err error
+	withLabels(ctx, labelDelete, func() {
+		err = db.remove(table, key)
+	})
+	return err
+}
+
+func (db *trainkvDB) remove(table string, key string) error {
 	txn := db.db.NewTransaction(true)
 
 	if err := txn.Delete(db.getRowKey(table, key)); err != nil {

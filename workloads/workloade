@@ -26,6 +26,9 @@
 # instead interspersed with posts from lots of other threads. The way the YCSB client works is that it will pick a start
 # key, and then request a number of records; this works fine even for hashed insertion.
 
+# 95%扫描/5%插入
+# 短范围扫描为主的场景(典型应用: 线程化会话, 读取某主题最近的一小段连续记录), 95% 扫描 + 5% 插入。
+#   每次从 zipfian 选定的起点连续扫描最多 100 条记录(长度均匀分布), 用于压测范围查询与迭代器性能。
 recordcount=1000
 operationcount=1000
 workload=core

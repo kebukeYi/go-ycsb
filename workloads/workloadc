@@ -21,6 +21,9 @@
 #   Default data size: 1 KB records (10 fields, 100 bytes each, plus key)
 #   Request distribution: zipfian
 
+# 100%读
+# 纯只读场景(典型应用: 用户画像缓存), 100% 读、没有任何写操作。
+#   键按 zipfian 分布访问, 是最纯粹的读性能基准, 重点观察读放大、缓存命中与分位延迟。
 recordcount=1000
 operationcount=1000
 workload=core
@@ -32,7 +35,8 @@ updateproportion=0
 scanproportion=0
 insertproportion=0
 
-requestdistribution=uniform
+# requestdistribution=uniform
+requestdistribution=zipfian
 
 
 

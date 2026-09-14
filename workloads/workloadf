@@ -21,6 +21,9 @@
 #   Default data size: 1 KB records (10 fields, 100 bytes each, plus key)
 #   Request distribution: zipfian
 
+# 100%读/更新
+# 读改写(RMW)场景(典型应用: 用户数据库/计数器, 读出记录后立即修改并写回), 50% 读 + 50% 读改写。
+#   键按 zipfian 分布访问, 重点考察数据库的"读-改-写"事务路径与并发冲突处理能力。
 recordcount=1000
 operationcount=1000
 workload=core
@@ -33,5 +36,6 @@ scanproportion=0
 insertproportion=0
 readmodifywriteproportion=0.5
 
-requestdistribution=uniform
+# requestdistribution=uniform
+requestdistribution=zipfian
 

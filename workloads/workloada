@@ -22,6 +22,9 @@
 #   Default data size: 1 KB records (10 fields, 100 bytes each, plus key)
 #   Request distribution: zipfian
 
+# 50%读/50%更新
+# 读写均衡的更新密集型场景(典型应用: 会话存储, 记录用户最近的操作), 读、更新各占 50%。
+#   键按 zipfian 分布(热点倾斜)访问, 用于衡量数据库在读写混合、以更新为主压力下的吞吐与延迟。
 recordcount=1000
 operationcount=1000
 workload=core
@@ -33,5 +36,6 @@ updateproportion=0.5
 scanproportion=0
 insertproportion=0
 
-requestdistribution=uniform
+# requestdistribution=uniform
+requestdistribution=zipfian
 

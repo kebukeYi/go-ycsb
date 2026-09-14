@@ -26,6 +26,9 @@
 # which orders items purely by time, and demands the latest, is very different than 
 # workload here (which we believe is more typical of how people build systems.)
 
+# 95%读/5%插入
+# 读最新数据 + 持续插入的场景(典型应用: 状态更新/时间线, 读集中在最近写入的记录), 95% 读 + 5% 插入。
+
 recordcount=1000
 operationcount=1000
 workload=core

@@ -6,6 +6,11 @@
 #   - own isolated data dir under /tmp/ab-<db>, wiped via dropdata=true before load
 #   - engine config left at defaults (both have SyncWrites=false by default)
 #
+# 约定(重要): 所有测试默认关闭同步写(sync_writes=false), 不主动运行同步写测试;
+#   如确需同步写对比, 必须显式通过 EXTRA_A/EXTRA_B 传入, 严禁作为默认行为.
+# 线程数陷阱: 必须用 --threads N 或 -p threadcount=N; `-p threads=N` 是无效属性,
+#   go-ycsb 只认 "threadcount", 写错会静默退化成单线程.
+#
 # Usage:
 #   tool/ab_bench.sh [dbA] [dbB]
 # Env overrides: RECORDCOUNT (default 100000) OPERATIONCOUNT (default 50000)
@@ -59,11 +64,11 @@ run_phase() {
         rm -rf "$dir"
         mkdir -p "$dir"
         "$BIN" load "$db" -P "$PROP_DIR/workloada" \
-            -p dropdata=true -p recordcount="$RECORDCOUNT" -p threads="$THREADS" \
+            -p dropdata=true -p recordcount="$RECORDCOUNT" --threads "$THREADS" \
             "${props[@]}" "${extra[@]}" >"$out" 2>&1
     else
         "$BIN" run "$db" -P "$PROP_DIR/workload$phase" \
-            -p operationcount="$OPERATIONCOUNT" -p threads="$THREADS" \
+            -p operationcount="$OPERATIONCOUNT" --threads "$THREADS" \
             "${props[@]}" "${extra[@]}" >"$out" 2>&1
     fi
 
